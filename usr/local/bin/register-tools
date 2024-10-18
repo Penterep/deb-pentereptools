@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# Cesta k aktivaci virtuálního prostředí
+VENV_ACTIVATE="/opt/penterep-tools/penterep-tools/bin/activate"
+
+# Aktivace virtuálního prostředí
+if [ -f "$VENV_ACTIVATE" ]; then
+    source "$VENV_ACTIVATE"
+else
+    echo "Soubor pro aktivaci virtuálního prostředí nebyl nalezen."
+    exit 1
+fi
+
+# Kontrola, zda je ptmanager dostupný
+if ! command -v ptmanager &> /dev/null; then
+    echo "ptmanager není dostupný. Zkontrolujte, zda je virtuální prostředí aktivováno a ptmanager nainstalován."
+    exit 1
+fi
+
+# Zavolání ptmanager --tools-list a uložení výstupu
+output=$(ptmanager --tools-list 2>&1)
+
+# Kontrola návratového kódu
+if [ $? -ne 0 ]; then
+    echo "Chyba při zavolání ptmanager: $output"
+    exit 1
+fi
+
+# Vytvoření prázdného pole pro uložení dat
+declare -a tools=()
+
+# Zpracování výstupu
+while IFS= read -r line; do
+    # Kontrola, zda řádek začíná prefixem "pt"
+    if [[ "$line" =~ ^pt ]]; then
+        # Vypsání řádku s nástrojem
+        #echo "$line"
+
+        # Parsování řádku na název nástroje a nainstalovanou verzi (pomocí regulárního výrazu)
+        tool_name=$(echo "$line" | awk '{print $1}')  # První slovo je název nástroje
+        installed_version=$(echo "$line" | awk '{print $2}')  # Druhé slovo je verze (může být "-")
+
+        # Výpis výsledků
+        #echo "Název nástroje: $tool_name"
+        #echo "Nainstalovaná verze: $installed_version"
+
+        # Uložení do pole (matrixu) pouze pokud verze není "-"
+        if [ "$installed_version" != "-" ]; then
+            tools+=("$tool_name,$installed_version")
+        fi
+    fi
+done <<< "$output"
+
+# Výpis pole (pro kontrolu)
+echo "Seznam instalovaných nástrojů a jejich verzí:"
+for tool in "${tools[@]}"; do
+    IFS=',' read -r name version <<< "$tool"
+    echo "Nástroj: $name, Verze: $version"
+done
+
+
+# Cesta, kam se uloží generované skripty
+SCRIPT_DIR="/usr/local/bin"  # Zajišťuje dostupnost pro všechny uživatele
+
+# Generování skriptů pro každého nainstalovaného nástroje
+for tool in "${tools[@]}"; do
+    IFS=',' read -r name version <<< "$tool"
+
+    # Vytvoření skriptu pro každý nástroj
+    script_path="$SCRIPT_DIR/$name"
+
+    # Vytvoření obsahu skriptu
+    echo "#!/bin/bash" > "$script_path"
+    echo "VENV_DIR=\"/opt/penterep-tools/penterep-tools\"" >> "$script_path"
+    echo "source \"\$VENV_DIR/bin/activate\"" >> "$script_path"
+    echo "$name \"\$@\"" >> "$script_path"  # Předání argumentů
+    echo "deactivate" >> "$script_path"
+
+    # Nastavení spustitelných oprávnění
+    chmod 755 "$script_path"
+
+    echo "Vytvořen skript: $script_path"
+done

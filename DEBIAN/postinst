@@ -1,0 +1,64 @@
+#!/bin/bash
+set -e
+
+# Definice barev
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color (reset barvy)
+
+# Cesta ke skriptu pro vytvoření virtuálního prostředí
+PT_VENV_SCRIPT="/opt/penterep-tools/ptvenv"
+# Cesta k aktivaci virtuálního prostředí
+VENV_ACTIVATE="/opt/penterep-tools/penterep-tools/bin/activate"
+
+# Spuštění skriptu pro vytvoření virtuálního prostředí (výstupy ponechány)
+if command -v "$PT_VENV_SCRIPT"; then
+    echo -e "${GREEN}Spouštím skript pro vytvoření venv:${NC} $PT_VENV_SCRIPT"
+    "$PT_VENV_SCRIPT"  # Necháváme výstup viditelný
+    echo -e "${GREEN}Skript pro vytvoření venv úspěšně dokončen.${NC}"
+else
+    echo -e "${RED}Skript $PT_VENV_SCRIPT nebyl nalezen.${NC}"
+    exit 1
+fi
+
+# Aktivace virtuálního prostředí
+echo -e "${YELLOW}Aktivuji virtuální prostředí...${NC}"
+if [ -f "$VENV_ACTIVATE" ]; then
+    source "$VENV_ACTIVATE"
+
+    # Příkaz k instalaci závislostí pomocí pip (výstupy potlačeny)
+    echo -e "${GREEN}Instaluji ptmanager pomocí pip...${NC}"
+    pip install ptmanager || { echo -e "${RED}Instalace selhala.${NC}"; exit 1; }
+
+else
+    echo -e "${RED}Soubor pro aktivaci virtuálního prostředí nebyl nalezen.${NC}"
+    exit 1
+fi
+
+# Dotaz na instalaci dalších nástrojů s opakováním a výzvou (výstupy zůstávají interaktivní)
+echo -e " "
+while true; do
+    read -p "Chcete doinstalovat i ostatní penterep nástroje? (y/n): " choice
+    case "$choice" in
+        [Yy]* )
+            echo -e "${GREEN}Doinstaluji ostatní penterep nástroje...${NC}"
+            # Spuštění ptmanager s aktivovaným venv
+            source "$VENV_ACTIVATE" && python3 /opt/penterep-tools/penterep-tools/lib/python3.11/site-packages/ptmanager/ptmanager.py --tools-install > /dev/null 2>&1 || { echo -e "${RED}Instalace dalších nástrojů selhala.${NC}"; exit 1; }
+
+            echo -e "${GREEN}Ostatní penterep nástroje úspěšně doinstalovány.${NC}"
+            break;;
+        [Nn]* )
+            echo -e "${YELLOW}Doinstalace ostatních nástrojů byla přeskočena.${NC}"
+            break;;
+        * )
+            echo -e "${RED}Prosím zadejte 'y' pro ano nebo 'n' pro ne.${NC}";;
+    esac
+done
+
+# Odstranění pomocného skriptu ptvenv (potlačeno)
+echo -e "${YELLOW}Odstraňuji pomocný skript ptvenv...${NC}"
+rm -f "$PT_VENV_SCRIPT" || { echo -e "${RED}Odstranění pomocného skriptu selhalo.${NC}"; exit 1; }
+
+echo -e "${GREEN}Instalace dokončena.${NC}"
+exit 0

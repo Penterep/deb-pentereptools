@@ -1,0 +1,57 @@
+#!/bin/bash
+
+#!/bin/bash
+set -e
+
+# Cesta k aktivaci virtuálního prostředí
+VENV_ACTIVATE="/opt/penterep-tools/penterep-tools/bin/activate"
+
+# Aktivace virtuálního prostředí
+if [ -f "$VENV_ACTIVATE" ]; then
+    source "$VENV_ACTIVATE"
+else
+    echo "Soubor pro aktivaci virtuálního prostředí nebyl nalezen."
+    exit 1
+fi
+
+# Zavolání ptmanager --tools-list a uložení výstupu
+output=$(ptmanager --tools-list 2>&1)
+
+# Kontrola návratového kódu
+if [ $? -ne 0 ]; then
+    echo "Chyba při zavolání ptmanager: $output"
+    exit 1
+fi
+
+# Vytvoření prázdného pole pro uložení názvů nástrojů
+declare -a tools=()
+
+# Zpracování výstupu
+while IFS= read -r line; do
+    # Kontrola, zda řádek začíná prefixem "pt"
+    if [[ "$line" =~ ^pt ]]; then
+        tool_name=$(echo "$line" | awk '{print $1}')  # Názov nástroje
+        tools+=("$tool_name")  # Uložení názvu do pole
+    fi
+done <<< "$output"
+
+# Mazání skriptů
+for tool in "${tools[@]}"; do
+    script_path="/usr/local/bin/$tool"
+    if [ -f "$script_path" ]; then
+        echo "Odstraňuji skript: $script_path"
+        rm -f "$script_path"  # Smazání skriptu
+    fi
+done
+
+# Deaktivace virtuálního prostředí
+deactivate
+
+
+# Smaže složku /opt/nazev-slozky při odinstalaci balíčku
+if [ -d "/opt/penterep-tools" ]; then
+    echo "Odstraňuji složku /opt/penterep-tools..."
+    rm -rf /opt/penterep-tools
+fi
+
+exit 0
