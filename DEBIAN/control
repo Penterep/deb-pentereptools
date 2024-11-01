@@ -1,8 +1,8 @@
 Package: penterep-tools
 Version: 0.1
-Section: misc
+Section: security
 Priority: optional
 Architecture: all
-Depends: python3, python3-pip
+Depends: python3-pip, python3-venv
 Maintainer: Penterep <info@penterep.com>
-Description: Penterep Script Management Tool (debian version)
+Description: Penterep Script Management Tool (Debian version)

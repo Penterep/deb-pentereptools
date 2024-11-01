@@ -1,64 +1,83 @@
 #!/bin/bash
 set -e
 
-# Definice barev
+# Color definitions
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
-NC='\033[0m' # No Color (reset barvy)
+NC='\033[0m' # No Color (color reset)
 
-# Cesta ke skriptu pro vytvoření virtuálního prostředí
-PT_VENV_SCRIPT="/opt/penterep-tools/ptvenv"
-# Cesta k aktivaci virtuálního prostředí
+# Define cleanup function
+cleanup() {
+    echo -e "${RED}Installation failed, purging directory /opt/penterep-tools...${NC}"
+    rm -rf /opt/penterep-tools
+}
+# Set trap to call cleanup on exit if the script fails
+trap 'cleanup' ERR
+
+# Paths to relevant scripts
+PT_VENV_SCRIPT="/opt/penterep-tools/helpers/ptvenv"
+REGISTER_TOOLS_SCRIPT="/opt/penterep-tools/helpers/register-tools"
 VENV_ACTIVATE="/opt/penterep-tools/penterep-tools/bin/activate"
 
-# Spuštění skriptu pro vytvoření virtuálního prostředí (výstupy ponechány)
-if command -v "$PT_VENV_SCRIPT"; then
-    echo -e "${GREEN}Spouštím skript pro vytvoření venv:${NC} $PT_VENV_SCRIPT"
-    "$PT_VENV_SCRIPT"  # Necháváme výstup viditelný
-    echo -e "${GREEN}Skript pro vytvoření venv úspěšně dokončen.${NC}"
+# Get the full Python version
+FULL_PYTHON_VERSION=$(python --version | awk '{print $2}')
+
+# Extract the major and minor version
+if [[ "$FULL_PYTHON_VERSION" =~ ^[0-9]+\.[0-9]+ ]]; then
+    PYTHON_VERSION=$(echo "$FULL_PYTHON_VERSION" | cut -d. -f1,2)
 else
-    echo -e "${RED}Skript $PT_VENV_SCRIPT nebyl nalezen.${NC}"
+    echo -e "${RED}Failed to determine Python version.${NC}"
     exit 1
 fi
 
-# Aktivace virtuálního prostředí
-echo -e "${YELLOW}Aktivuji virtuální prostředí...${NC}"
+# Run the script for creating the virtual environment
+if command -v "$PT_VENV_SCRIPT"; then
+    echo -e "${GREEN}Running script for creating venv:${NC} $PT_VENV_SCRIPT"
+    "$PT_VENV_SCRIPT"
+    echo -e "${GREEN}Venv created successfully.${NC}"
+else
+    echo -e "${RED}Script $PT_VENV_SCRIPT was not found.${NC}"
+    exit 1
+fi
+
+# Activate the virtual environment
+echo -e "${YELLOW}Activating virtual environment...${NC}"
 if [ -f "$VENV_ACTIVATE" ]; then
     source "$VENV_ACTIVATE"
 
-    # Příkaz k instalaci závislostí pomocí pip (výstupy potlačeny)
-    echo -e "${GREEN}Instaluji ptmanager pomocí pip...${NC}"
-    pip install ptmanager || { echo -e "${RED}Instalace selhala.${NC}"; exit 1; }
-
+    # Install ptmanager
+    echo -e "${GREEN}Installing ptmanager...${NC}"
+    pip install ptmanager || { echo -e "${RED}Installation failed.${NC}"; exit 1; }
 else
-    echo -e "${RED}Soubor pro aktivaci virtuálního prostředí nebyl nalezen.${NC}"
+    echo -e "${RED}The file to activate the virtual environment was not found.${NC}"
     exit 1
 fi
 
-# Dotaz na instalaci dalších nástrojů s opakováním a výzvou (výstupy zůstávají interaktivní)
-echo -e " "
+# Ask about installing other tools
 while true; do
-    read -p "Chcete doinstalovat i ostatní penterep nástroje? (y/n): " choice
+    read -p "Would you like to install other penterep tools as well? (Y/n): " choice
+    choice=${choice:-Y}
     case "$choice" in
         [Yy]* )
-            echo -e "${GREEN}Doinstaluji ostatní penterep nástroje...${NC}"
-            # Spuštění ptmanager s aktivovaným venv
-            source "$VENV_ACTIVATE" && python3 /opt/penterep-tools/penterep-tools/lib/python3.11/site-packages/ptmanager/ptmanager.py --tools-install > /dev/null 2>&1 || { echo -e "${RED}Instalace dalších nástrojů selhala.${NC}"; exit 1; }
-
-            echo -e "${GREEN}Ostatní penterep nástroje úspěšně doinstalovány.${NC}"
+            echo -e "${GREEN}Installing other penterep tools...${NC}"
+            source "$VENV_ACTIVATE" && python3 "/opt/penterep-tools/penterep-tools/lib/python${PYTHON_VERSION}/site-packages/ptmanager/ptmanager.py" --tools-install > /dev/null 2>&1 || {
+                echo -e "${RED}Installation of additional tools failed.${NC}"
+                exit 1
+            }
+            echo -e "${GREEN}Penterep tools successfully installed.${NC}"
             break;;
         [Nn]* )
-            echo -e "${YELLOW}Doinstalace ostatních nástrojů byla přeskočena.${NC}"
+            echo -e "${YELLOW}Installation of other penterep tools was skipped.${NC}"
             break;;
         * )
-            echo -e "${RED}Prosím zadejte 'y' pro ano nebo 'n' pro ne.${NC}";;
+            echo -e "${RED}Please enter 'y' for yes or 'n' for no.${NC}";;
     esac
 done
 
-# Odstranění pomocného skriptu ptvenv (potlačeno)
-echo -e "${YELLOW}Odstraňuji pomocný skript ptvenv...${NC}"
-rm -f "$PT_VENV_SCRIPT" || { echo -e "${RED}Odstranění pomocného skriptu selhalo.${NC}"; exit 1; }
+# Call register-tools to register ptmanager and other tools
+echo -e "${GREEN}Registering tools...${NC}"
+"$REGISTER_TOOLS_SCRIPT" || { echo -e "${RED}Registration of tools failed.${NC}"; exit 1; }
 
-echo -e "${GREEN}Instalace dokončena.${NC}"
+echo -e "${GREEN}Installation successful.${NC}"
 exit 0

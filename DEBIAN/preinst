@@ -10,7 +10,7 @@ echo "
 |_|   \___|_| |_|\__\___|_|  \___| .__/    |_|\___/ \___/|_|___/
                                  |_|
 
-Starting installation...
+Starting installation process...
 "
 
 exit 0

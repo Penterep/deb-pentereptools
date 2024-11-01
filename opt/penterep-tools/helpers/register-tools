@@ -3,8 +3,9 @@
 # Cesta k aktivaci virtuálního prostředí
 VENV_ACTIVATE="/opt/penterep-tools/penterep-tools/bin/activate"
 
-# Aktivace virtuálního prostředí
+# Aktivace virtuálního prostředí, pokud existuje
 if [ -f "$VENV_ACTIVATE" ]; then
+    # Aktivace virtuálního prostředí
     source "$VENV_ACTIVATE"
 else
     echo "Soubor pro aktivaci virtuálního prostředí nebyl nalezen."
@@ -33,47 +34,35 @@ declare -a tools=()
 while IFS= read -r line; do
     # Kontrola, zda řádek začíná prefixem "pt"
     if [[ "$line" =~ ^pt ]]; then
-        # Vypsání řádku s nástrojem
-        #echo "$line"
-
-        # Parsování řádku na název nástroje a nainstalovanou verzi (pomocí regulárního výrazu)
+        # Parsování řádku na název nástroje (první slovo)
         tool_name=$(echo "$line" | awk '{print $1}')  # První slovo je název nástroje
-        installed_version=$(echo "$line" | awk '{print $2}')  # Druhé slovo je verze (může být "-")
 
-        # Výpis výsledků
-        #echo "Název nástroje: $tool_name"
-        #echo "Nainstalovaná verze: $installed_version"
-
-        # Uložení do pole (matrixu) pouze pokud verze není "-"
-        if [ "$installed_version" != "-" ]; then
-            tools+=("$tool_name,$installed_version")
+        # Uložení do pole pouze pokud verze není "-"
+        if [[ "$line" != *"-"* ]]; then
+            tools+=("$tool_name")
         fi
     fi
 done <<< "$output"
 
 # Výpis pole (pro kontrolu)
-echo "Seznam instalovaných nástrojů a jejich verzí:"
+echo "Seznam instalovaných nástrojů:"
 for tool in "${tools[@]}"; do
-    IFS=',' read -r name version <<< "$tool"
-    echo "Nástroj: $name, Verze: $version"
+    echo "Nástroj: $tool"
 done
 
-
 # Cesta, kam se uloží generované skripty
-SCRIPT_DIR="/usr/local/bin"  # Zajišťuje dostupnost pro všechny uživatele
+SCRIPT_DIR="/opt/penterep-tools/scripts"  # Uložení do správného adresáře
 
 # Generování skriptů pro každého nainstalovaného nástroje
 for tool in "${tools[@]}"; do
-    IFS=',' read -r name version <<< "$tool"
-
     # Vytvoření skriptu pro každý nástroj
-    script_path="$SCRIPT_DIR/$name"
+    script_path="$SCRIPT_DIR/$tool"
 
     # Vytvoření obsahu skriptu
     echo "#!/bin/bash" > "$script_path"
     echo "VENV_DIR=\"/opt/penterep-tools/penterep-tools\"" >> "$script_path"
     echo "source \"\$VENV_DIR/bin/activate\"" >> "$script_path"
-    echo "$name \"\$@\"" >> "$script_path"  # Předání argumentů
+    echo "$tool \"\$@\"" >> "$script_path"  # Předání argumentů
     echo "deactivate" >> "$script_path"
 
     # Nastavení spustitelných oprávnění
@@ -81,3 +70,15 @@ for tool in "${tools[@]}"; do
 
     echo "Vytvořen skript: $script_path"
 done
+
+# -- Přidání skriptů do PATH na začátek nebo aktualizace stávajícího PATH --
+
+# Aktualizace /etc/environment
+current_path=$(grep '^PATH=' /etc/environment | cut -d'=' -f2 | tr -d '"')
+if [[ ! "$current_path" =~ "/opt/penterep-tools/scripts" ]]; then
+    new_path="/opt/penterep-tools/scripts:$current_path"
+    echo "Aktualizuji PATH v /etc/environment: $new_path"
+    sudo sed -i "s|^PATH=.*|PATH=\"$new_path\"|" /etc/environment
+else
+    echo "/opt/penterep-tools/scripts již existuje v PATH v /etc/environment."
+fi
