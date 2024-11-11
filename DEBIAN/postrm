@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Načtení seznamu souborů z /opt/penterep-tools/scripts do pole
+scripts_dir="/opt/penterep-tools/scripts"
+script_files+=("penterep-tools" "register-tools")
+
+if [ -d "$scripts_dir" ]; then
+    script_files=($(ls "$scripts_dir"))
+else
+    echo "Scripts directory does not exist."
+fi
+
+# Odstranění souborů z /usr/local/bin, které jsou ve skriptech
+for script in "${script_files[@]}"; do
+    script_path="/usr/local/bin/$script"
+
+    if [ -f "$script_path" ]; then
+        echo "Deleting $script_path..."
+        rm "$script_path"
+    else
+        echo "$script_path does not exist in /usr/local/bin."
+    fi
+done
+
+# Check if in a virtual environment
+if [ -n "$VIRTUAL_ENV" ]; then
+    # Deactivate the virtual environment
+    deactivate || echo "Not in a virtual environment or failed to deactivate."
+fi
+
+# Remove the directory /opt/penterep-tools if it exists
+if [ -d "/opt/penterep-tools" ]; then
+    echo "Deleting folder /opt/penterep-tools..."
+    rm -rf /opt/penterep-tools
+else
+    echo "Folder /opt/penterep-tools does not exist."
+fi
+
+
+exit 0

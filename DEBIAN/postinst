@@ -3,13 +3,12 @@ set -e
 
 # Color definitions
 RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-NC='\033[0m' # No Color (color reset)
+ORANGE='\033[38;5;214m'
+NC='\033[0m' # (color reset)
 
 # Define cleanup function
 cleanup() {
-    echo -e "${RED}Installation failed, purging directory /opt/penterep-tools...${NC}"
+    echo -e "${RED}[!] Installation failed, purging directory /opt/penterep-tools...${NC}"
     rm -rf /opt/penterep-tools
 }
 # Set trap to call cleanup on exit if the script fails
@@ -17,7 +16,6 @@ trap 'cleanup' ERR
 
 # Paths to relevant scripts
 PT_VENV_SCRIPT="/opt/penterep-tools/helpers/ptvenv"
-REGISTER_TOOLS_SCRIPT="/opt/penterep-tools/helpers/register-tools"
 VENV_ACTIVATE="/opt/penterep-tools/penterep-tools/bin/activate"
 
 # Get the full Python version
@@ -27,57 +25,60 @@ FULL_PYTHON_VERSION=$(python --version | awk '{print $2}')
 if [[ "$FULL_PYTHON_VERSION" =~ ^[0-9]+\.[0-9]+ ]]; then
     PYTHON_VERSION=$(echo "$FULL_PYTHON_VERSION" | cut -d. -f1,2)
 else
-    echo -e "${RED}Failed to determine Python version.${NC}"
+    echo -e "${RED}[!] Failed to determine Python version.${NC}"
     exit 1
 fi
 
 # Run the script for creating the virtual environment
 if command -v "$PT_VENV_SCRIPT"; then
-    echo -e "${GREEN}Running script for creating venv:${NC} $PT_VENV_SCRIPT"
+    echo -e "${ORANGE}[+] Running script for creating venv:${NC} $PT_VENV_SCRIPT"
     "$PT_VENV_SCRIPT"
-    echo -e "${GREEN}Venv created successfully.${NC}"
+    echo -e "${ORANGE}[+] Venv created successfully.${NC}"
 else
-    echo -e "${RED}Script $PT_VENV_SCRIPT was not found.${NC}"
+    echo -e "${RED}[!] Script $PT_VENV_SCRIPT was not found.${NC}"
     exit 1
 fi
 
 # Activate the virtual environment
-echo -e "${YELLOW}Activating virtual environment...${NC}"
+echo -e "${ORANGE}[+] Activating virtual environment...${NC}"
 if [ -f "$VENV_ACTIVATE" ]; then
     source "$VENV_ACTIVATE"
 
     # Install ptmanager
-    echo -e "${GREEN}Installing ptmanager...${NC}"
-    pip install ptmanager || { echo -e "${RED}Installation failed.${NC}"; exit 1; }
+    echo -e "${ORANGE}[+] Installing ptmanager...${NC}"
+    pip install --quiet ptmanager || { echo -e "${RED}Installation failed.${NC}"; exit 1; }
 else
-    echo -e "${RED}The file to activate the virtual environment was not found.${NC}"
+    echo -e "${RED}[!] The file to activate the virtual environment was not found.${NC}"
     exit 1
 fi
 
 # Ask about installing other tools
 while true; do
-    read -p "Would you like to install other penterep tools as well? (Y/n): " choice
+    read -p "[+] Would you like to install other penterep tools as well? (Y/n): " choice
     choice=${choice:-Y}
     case "$choice" in
         [Yy]* )
-            echo -e "${GREEN}Installing other penterep tools...${NC}"
+            echo -e "${ORANGE}[+] Installing all penterep tools...${NC}"
             source "$VENV_ACTIVATE" && python3 "/opt/penterep-tools/penterep-tools/lib/python${PYTHON_VERSION}/site-packages/ptmanager/ptmanager.py" --tools-install > /dev/null 2>&1 || {
-                echo -e "${RED}Installation of additional tools failed.${NC}"
+                echo -e "${RED}[!] Installation of additional tools failed.${NC}"
                 exit 1
             }
-            echo -e "${GREEN}Penterep tools successfully installed.${NC}"
+            echo -e "${ORANGE}[+] Penterep tools successfully installed.${NC}"
             break;;
         [Nn]* )
-            echo -e "${YELLOW}Installation of other penterep tools was skipped.${NC}"
+            echo -e "${ORANGE}[+] Installation of other penterep tools was skipped.${NC}"
             break;;
         * )
-            echo -e "${RED}Please enter 'y' for yes or 'n' for no.${NC}";;
+            echo -e "${RED}[*] Please enter 'y' for yes or 'n' for no.${NC}";;
     esac
 done
 
-# Call register-tools to register ptmanager and other tools
-echo -e "${GREEN}Registering tools...${NC}"
-"$REGISTER_TOOLS_SCRIPT" || { echo -e "${RED}Registration of tools failed.${NC}"; exit 1; }
 
-echo -e "${GREEN}Installation successful.${NC}"
+#REGISTER_TOOLS_SCRIPT="/opt/penterep-tools/helpers/register-tools"
+REGISTER_TOOLS_SCRIPT="/usr/local/bin/register-tools"
+# Call register-tools to register ptmanager and other tools
+#echo -e "${ORANGE}[+] Registering tools...${NC}"
+"$REGISTER_TOOLS_SCRIPT" || { echo -e "${RED}[!] Registration of tools failed.${NC}"; exit 1; }
+
+echo -e "${ORANGE}[+] Installation successful.${NC}"
 exit 0

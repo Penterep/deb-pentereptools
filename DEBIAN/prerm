@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+C='\033[38;5;214m'
+NC='\033[0m' # (color reset)
+
 # Výpis loga
 echo "
  ____            _                        _____           _
@@ -9,22 +12,8 @@ echo "
 |  __/  __/ | | | ||  __/ | |  __/ |_) |   | | (_) | (_) | \__ \\
 |_|   \___|_| |_|\__\___|_|  \___| .__/    |_|\___/ \___/|_|___/
                                  |_|
-
-Starting uninstallation process...
 "
 
-# Check if in a virtual environment
-if [ -n "$VIRTUAL_ENV" ]; then
-    # Deactivate the virtual environment
-    deactivate || echo "Not in a virtual environment or failed to deactivate."
-fi
-
-# Remove the directory /opt/penterep-tools if it exists
-if [ -d "/opt/penterep-tools" ]; then
-    echo "Deleting folder /opt/penterep-tools..."
-    rm -rf /opt/penterep-tools
-else
-    echo "Folder /opt/penterep-tools does not exist."
-fi
+echo -e "${C}[+] Starting uninstallation process...${NC}"
 
 exit 0

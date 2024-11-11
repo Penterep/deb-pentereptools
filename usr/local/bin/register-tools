@@ -1,0 +1,117 @@
+#!/bin/bash
+
+# Check if the script is running with sudo
+if [ "$EUID" -ne 0 ]; then
+    exec sudo "$0" "$@"
+    exit 1
+fi
+
+
+# Cesta k aktivaci virtuálního prostředí
+VENV_ACTIVATE="/opt/penterep-tools/penterep-tools/bin/activate"
+
+# Aktivace virtuálního prostředí, pokud existuje
+if [ -f "$VENV_ACTIVATE" ]; then
+    # Aktivace virtuálního prostředí
+    source "$VENV_ACTIVATE"
+else
+    echo "Soubor pro aktivaci virtuálního prostředí nebyl nalezen."
+    exit 1
+fi
+
+# Kontrola, zda je ptmanager dostupný
+if ! command -v ptmanager &> /dev/null; then
+    echo "ptmanager není dostupný. Zkontrolujte, zda je virtuální prostředí aktivováno a ptmanager nainstalován."
+    exit 1
+fi
+
+# Pokud je argument předán, použijeme tento nástroj, jinak spustíme ptmanager --tools-list
+if [ $# -eq 1 ]; then
+    tool_name="$1"
+    tools=("$tool_name")
+else
+    # Zavolání ptmanager --tools-list a uložení výstupu
+    output=$(ptmanager --tools-list 2>&1)
+
+    # Kontrola návratového kódu
+    if [ $? -ne 0 ]; then
+        echo "Chyba při zavolání ptmanager: $output"
+        exit 1
+    fi
+
+    # Vytvoření prázdného pole pro uložení dat
+    declare -a tools=()
+
+    # Zpracování výstupu
+    while IFS= read -r line; do
+        # Kontrola, zda řádek začíná prefixem "pt"
+        if [[ "$line" =~ ^pt ]]; then
+            # Parsování řádku na název nástroje (první slovo)
+            tool_name=$(echo "$line" | awk '{print $1}')  # První slovo je název nástroje
+
+            # Uložení do pole pouze pokud verze není "-"
+            if [[ "$line" != *"-"* ]]; then
+                tools+=("$tool_name")
+            fi
+        fi
+    done <<< "$output"
+fi
+
+# Výpis pole (pro kontrolu)
+#echo "Seznam instalovaných nástrojů:"
+#for tool in "${tools[@]}"; do
+#    echo "Nástroj: $tool"
+#done
+
+# Cesta, kam se uloží generované skripty
+SCRIPT_DIR="/usr/local/bin"  # Uložení do správného adresáře
+LOG_DIR="/opt/penterep-tools/scripts"  # Cesta pro evidenci
+
+# Generování skriptů pro každého nainstalovaného nástroje
+for tool in "${tools[@]}"; do
+    # Vytvoření skriptu pro každý nástroj
+    script_path="$SCRIPT_DIR/$tool"
+    log_path="$LOG_DIR/$tool"
+
+    # Pokud skript existuje v /usr/local/bin, smažeme ho
+        if [ -f "$script_path" ]; then
+            #echo "Skript $script_path již existuje a bude nahrazen."
+            rm "$script_path"
+        fi
+
+    echo "#!/bin/bash" > "$script_path"
+    echo "" >> "$script_path"
+    echo "VENV_DIR=\"/opt/penterep-tools/penterep-tools\"" >> "$script_path"
+    echo "" >> "$script_path"
+    echo "if [ -z \"\$VIRTUAL_ENV\" ]; then" >> "$script_path"
+    echo "    source \"\$VENV_DIR/bin/activate\"" >> "$script_path"
+    echo "" >> "$script_path"
+    echo "    if ! command -v $tool &> /dev/null; then" >> "$script_path"
+    echo "        echo \"Error: $tool is not installed in the virtual environment.\"" >> "$script_path"
+    echo "        deactivate" >> "$script_path"
+    echo "        exit 1" >> "$script_path"
+    echo "    fi" >> "$script_path"
+    echo "" >> "$script_path"
+    echo "    $tool \"\$@\"" >> "$script_path"
+    echo "" >> "$script_path"
+    echo "    deactivate" >> "$script_path"
+    echo "else" >> "$script_path"
+    echo "    if [[ \"\$(realpath \"\$0\")\" == \"/usr/local/bin/$tool\" ]]; then" >> "$script_path"
+    echo "        echo \"Error: $tool is not installed in the virtual environment.\"" >> "$script_path"
+    echo "        exit 1" >> "$script_path"
+    echo "    fi" >> "$script_path"
+    echo "" >> "$script_path"
+    echo "    $tool \"\$@\"" >> "$script_path"
+    echo "fi" >> "$script_path"
+
+    # Nastavení spustitelných oprávnění
+    chmod 755 "$script_path"
+
+    #echo "Vytvořen skript: $script_path"
+
+    # Zaevidování do LOG_DIR, pokud záznam ještě neexistuje
+    if [ ! -f "$log_path" ]; then
+        touch "$log_path"
+        #echo "Skript $tool byl zaevidován v $LOG_DIR."
+    fi
+done
