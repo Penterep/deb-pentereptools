@@ -15,7 +15,7 @@ for script in "${script_files[@]}"; do
     script_path="/usr/local/bin/$script"
 
     if [ -f "$script_path" ]; then
-        echo "Deleting $script_path..."
+        #echo "Deleting $script_path..."
         rm "$script_path"
     else
         echo "$script_path does not exist in /usr/local/bin."
