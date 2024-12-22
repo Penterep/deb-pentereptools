@@ -3,7 +3,7 @@ set -e
 
 # Color definitions
 RED='\033[0;31m'
-ORANGE='\033[38;5;214m'
+ORANGE='\033[0m' # \033[38;5;214m
 NC='\033[0m' # (color reset)
 
 # Define cleanup function
@@ -19,7 +19,7 @@ PT_VENV_SCRIPT="/opt/penterep-tools/helpers/ptvenv"
 VENV_ACTIVATE="/opt/penterep-tools/penterep-tools/bin/activate"
 
 # Get the full Python version
-FULL_PYTHON_VERSION=$(python --version | awk '{print $2}')
+FULL_PYTHON_VERSION=$(python3 --version | awk '{print $2}')
 
 # Extract the major and minor version
 if [[ "$FULL_PYTHON_VERSION" =~ ^[0-9]+\.[0-9]+ ]]; then

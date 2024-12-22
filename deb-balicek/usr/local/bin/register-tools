@@ -41,7 +41,7 @@ else
 
     # Vytvoření prázdného pole pro uložení dat
     declare -a tools=()
-    tools+=("ptlibs")
+    tools+=("ptlibs", "ptmanager")
 
     # Zpracování výstupu
     while IFS= read -r line; do
