@@ -4,6 +4,8 @@ set -e
 APP_DIR="/opt/penterep-tools"
 UPGRADE_BACKUP_DIR="/opt/.penterep-tools-upgrade"
 LOG_DIR="$APP_DIR/scripts"
+DESKTOP_DIR="/usr/share/applications"
+DESKTOP_PREFIX="penterep-"
 
 # LEGACY_0_2_MIGRATION: Backup recovery, legacy launcher detection, and the
 # ptlibs comma workaround can be removed when direct upgrades from 0.2 end.
@@ -21,6 +23,12 @@ is_managed_launcher() {
     # The VENV_DIR signature identifies launchers created by version 0.2.
     grep -Fq '# Managed by penterep-tools' "$launcher" 2>/dev/null || \
         grep -Fq 'VENV_DIR="/opt/penterep-tools/penterep-tools"' "$launcher" 2>/dev/null
+}
+
+is_managed_desktop() {
+    desktop_file="$1"
+    [ -f "$desktop_file" ] || return 1
+    grep -Fqx 'X-Penterep-Managed=true' "$desktop_file" 2>/dev/null
 }
 
 remove_recorded_launchers() {
@@ -53,6 +61,11 @@ remove_recorded_launchers() {
                 rm -f "$launcher"
             fi
         done
+
+        desktop_file="$DESKTOP_DIR/${DESKTOP_PREFIX}${tool}.desktop"
+        if is_managed_desktop "$desktop_file"; then
+            rm -f "$desktop_file"
+        fi
     done
 }
 
@@ -70,8 +83,8 @@ case "${1:-}" in
 
     remove|purge|disappear)
         # These actions represent an actual uninstall, not an upgrade.
-        # Remove only launchers positively identified as ours before deleting
-        # application state and any abandoned transition backup.
+        # Remove only launchers and menu entries positively identified as ours
+        # before deleting application state and any transition backup.
         restore_interrupted_upgrade
         remove_recorded_launchers
         rm -rf "$APP_DIR" "$UPGRADE_BACKUP_DIR"

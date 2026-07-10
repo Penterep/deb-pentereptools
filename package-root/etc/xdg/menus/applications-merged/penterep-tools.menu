@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE Menu PUBLIC "-//freedesktop//DTD Menu 1.0//EN" "http://www.freedesktop.org/standards/menu-spec/1.0/menu.dtd">
+<Menu>
+  <Name>Applications</Name>
+  <Menu>
+    <Name>Penterep Tools</Name>
+    <Directory>penterep-tools.directory</Directory>
+    <Include>
+      <Category>penterep-tools</Category>
+    </Include>
+  </Menu>
+</Menu>

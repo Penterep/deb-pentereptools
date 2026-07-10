@@ -10,7 +10,7 @@ APP_DIR="/opt/penterep-tools"
 UPGRADE_BACKUP_DIR="/opt/.penterep-tools-upgrade"
 PT_VENV_SCRIPT="/usr/lib/penterep-tools/ptvenv"
 VENV_ACTIVATE="/opt/penterep-tools/penterep-tools/bin/activate"
-REGISTER_TOOLS_SCRIPT="/usr/bin/register-tools"
+REGISTER_TOOLS_SCRIPT="/usr/lib/penterep-tools/register-tools"
 
 # LEGACY_0_2_MIGRATION: BEGIN
 # preinst hides APP_DIR only for the first upgrade from the legacy 0.2

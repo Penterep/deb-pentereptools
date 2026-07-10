@@ -1,0 +1,17 @@
+#!/bin/sh
+
+tool="$1"
+shift
+
+if [ ! -x "$tool" ]; then
+    echo "Error: $tool is not available." >&2
+else
+    "$tool" "$@"
+fi
+
+shell="${SHELL:-/bin/sh}"
+if [ ! -x "$shell" ]; then
+    shell=/bin/sh
+fi
+
+exec "$shell" -i
