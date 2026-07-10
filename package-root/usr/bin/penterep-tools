@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Path to the virtual environment managed by the penterep-tools package.
+VENV_DIR="/opt/penterep-tools/penterep-tools"
+
+if [ "$EUID" -ne 0 ]; then
+    exec sudo "$0" "$@"
+fi
+
+if [ ! -f "$VENV_DIR/bin/activate" ]; then
+    echo "Virtual environment $VENV_DIR does not exist." >&2
+    exit 1
+fi
+
+source "$VENV_DIR/bin/activate"
+exec "$SHELL"

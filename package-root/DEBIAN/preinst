@@ -1,0 +1,47 @@
+#!/bin/bash
+set -e
+
+C='\033[38;5;214m'
+NC='\033[0m' # (color reset)
+
+APP_DIR="/opt/penterep-tools"
+UPGRADE_BACKUP_DIR="/opt/.penterep-tools-upgrade"
+
+# Výpis loga
+echo "
+ ____            _                        _____           _
+|  _ \ ___ _ __ | |_ ___ _ __ ___ _ __   |_   _|__   ___ | |___
+| |_) / _ \ '_ \| __/ _ \ '__/ _ \ '_ \    | |/ _ \ / _ \| / __|
+|  __/  __/ | | | ||  __/ | |  __/ |_) |   | | (_) | (_) | \__ \\
+|_|   \___|_| |_|\__\___|_|  \___| .__/    |_|\___/ \___/|_|___/
+                                 |_|
+"
+
+echo -e "${C}[+] Starting installation process...${NC}"
+
+# LEGACY_0_2_MIGRATION: BEGIN
+# Version 0.2 runs its old, destructive postrm during an upgrade and removes
+# APP_DIR unconditionally.  Hide the existing application directory before
+# dpkg invokes that old postrm.  The new postinst restores it after unpacking.
+# This compatibility branch is only needed for upgrades from versions older
+# than 0.3; postrm in 0.3 and later does not remove APP_DIR during upgrades.
+if [ "${1:-}" = "upgrade" ] && [ -n "${2:-}" ] && dpkg --compare-versions "$2" lt 0.3; then
+    if [ -e "$APP_DIR" ] && [ -e "$UPGRADE_BACKUP_DIR" ]; then
+        echo "[!] Both $APP_DIR and $UPGRADE_BACKUP_DIR exist; refusing to overwrite either directory." >&2
+        exit 1
+    fi
+
+    if [ -d "$APP_DIR" ]; then
+        # dpkg will later try to remove directory entries that existed only in
+        # the old package.  It never removes their contents and safely leaves
+        # every non-empty directory in place.
+        echo -e "${C}[+] Existing virtual environment and installed tools will be preserved.${NC}"
+        echo -e "${C}[+] Note: dpkg may report that obsolete /usr/local or /opt directories are not empty.${NC}"
+        echo -e "${C}[+] This is expected during this one-time upgrade; their contents will not be removed.${NC}"
+        echo -e "${C}[+] Protecting the existing virtual environment during the upgrade...${NC}"
+        mv "$APP_DIR" "$UPGRADE_BACKUP_DIR"
+    fi
+fi
+# LEGACY_0_2_MIGRATION: END
+
+exit 0

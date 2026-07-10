@@ -1,16 +1,16 @@
 #!/usr/bin/python3
 import os
-import venv
 import sys
+import venv
 
 
 VENV_DIR = os.path.join("/opt", "penterep-tools", "penterep-tools")
+
 try:
     if not os.path.exists(VENV_DIR):
         venv.EnvBuilder(with_pip=True).create(VENV_DIR)
     else:
         print(f"Virtual environment already exists in {VENV_DIR}.")
-
-except Exception as e:
-    print(f"Error creating virtual environment: {e}")
+except Exception as exc:
+    print(f"Error creating virtual environment: {exc}")
     sys.exit(1)

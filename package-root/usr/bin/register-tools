@@ -1,0 +1,145 @@
+#!/bin/bash
+set -e
+
+VENV_DIR="/opt/penterep-tools/penterep-tools"
+VENV_ACTIVATE="$VENV_DIR/bin/activate"
+SCRIPT_DIR="/usr/bin"
+# LEGACY_0_2_MIGRATION: The /usr/local cleanup and legacy launcher signature
+# can be removed when direct upgrades from version 0.2 are no longer supported.
+LEGACY_SCRIPT_DIR="/usr/local/bin"
+LOG_DIR="/opt/penterep-tools/scripts"
+
+if [ "$EUID" -ne 0 ]; then
+    exec sudo "$0" "$@"
+fi
+
+if [ ! -f "$VENV_ACTIVATE" ]; then
+    echo "Virtual environment $VENV_DIR does not exist." >&2
+    exit 1
+fi
+
+source "$VENV_ACTIVATE"
+
+if ! command -v ptmanager >/dev/null 2>&1; then
+    echo "ptmanager is not installed in $VENV_DIR." >&2
+    exit 1
+fi
+
+mkdir -p "$LOG_DIR"
+
+is_valid_tool_name() {
+    case "$1" in
+        *[!A-Za-z0-9._+-]*|'') return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+is_managed_launcher() {
+    launcher="$1"
+    [ -f "$launcher" ] || return 1
+    # The VENV_DIR signature identifies launchers created by version 0.2.
+    grep -Fq '# Managed by penterep-tools' "$launcher" 2>/dev/null || \
+        grep -Fq 'VENV_DIR="/opt/penterep-tools/penterep-tools"' "$launcher" 2>/dev/null
+}
+
+remove_legacy_launchers() {
+    # Evidence files contain only names of tools whose launchers were created
+    # by the previous package.  Delete those launchers rather than moving or
+    # copying them; fresh launchers are generated below for /usr/bin.
+    for record in "$LOG_DIR"/*; do
+        [ -f "$record" ] || continue
+        recorded_tool="${record##*/}"
+
+        # Version 0.2 accidentally recorded "ptlibs," (including the comma)
+        # because its Bash array used a comma as if it were a separator.
+        # Remove that known legacy launcher and marker; a correct ptlibs
+        # launcher and marker are generated below.
+        if [ "$recorded_tool" = "ptlibs," ]; then
+            legacy_launcher="$LEGACY_SCRIPT_DIR/$recorded_tool"
+            if is_managed_launcher "$legacy_launcher"; then
+                rm -f "$legacy_launcher"
+            fi
+            rm -f "$record"
+            continue
+        fi
+
+        is_valid_tool_name "$recorded_tool" || continue
+
+        legacy_launcher="$LEGACY_SCRIPT_DIR/$recorded_tool"
+        if is_managed_launcher "$legacy_launcher"; then
+            rm -f "$legacy_launcher"
+        fi
+    done
+}
+
+add_tool() {
+    candidate="$1"
+    is_valid_tool_name "$candidate" || {
+        echo "Invalid tool name: $candidate" >&2
+        exit 1
+    }
+
+    if [ -z "${seen_tools[$candidate]+set}" ]; then
+        tools+=("$candidate")
+        seen_tools["$candidate"]=1
+    fi
+}
+
+declare -a tools=()
+declare -A seen_tools=()
+
+if [ "$#" -eq 1 ]; then
+    add_tool "$1"
+elif [ "$#" -eq 0 ]; then
+    output=$(ptmanager --tools-list 2>&1) || {
+        echo "Failed to query installed tools: $output" >&2
+        exit 1
+    }
+
+    add_tool "ptlibs"
+    add_tool "ptmanager"
+
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^pt ]] && [[ "$line" != *"-"* ]]; then
+            add_tool "${line%%[[:space:]]*}"
+        fi
+    done <<< "$output"
+else
+    echo "Usage: register-tools [tool-name]" >&2
+    exit 1
+fi
+
+# Check the complete target set before deleting any legacy launcher.  A name
+# collision must leave the old command usable and fail the package upgrade
+# instead of overwriting a file owned by the system or another package.
+for tool in "${tools[@]}"; do
+    script_path="$SCRIPT_DIR/$tool"
+    if [ -e "$script_path" ] && ! is_managed_launcher "$script_path"; then
+        echo "Refusing to overwrite unmanaged file $script_path." >&2
+        exit 1
+    fi
+done
+
+remove_legacy_launchers
+
+for tool in "${tools[@]}"; do
+    script_path="$SCRIPT_DIR/$tool"
+    log_path="$LOG_DIR/$tool"
+    venv_tool="$VENV_DIR/bin/$tool"
+
+    temporary_script=$(mktemp "$SCRIPT_DIR/.penterep-${tool}.XXXXXX")
+    {
+        echo '#!/bin/sh'
+        echo '# Managed by penterep-tools; do not edit.'
+        printf 'VENV_TOOL=%q\n' "$venv_tool"
+        echo 'if [ ! -x "$VENV_TOOL" ]; then'
+        printf '    echo "Error: %s is not installed in the Penterep virtual environment." >&2\n' "$tool"
+        echo '    exit 1'
+        echo 'fi'
+        echo 'exec "$VENV_TOOL" "$@"'
+    } > "$temporary_script"
+
+    chmod 755 "$temporary_script"
+    mv -f "$temporary_script" "$script_path"
+    touch "$log_path"
+done
